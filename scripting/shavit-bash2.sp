@@ -1,3 +1,14 @@
+/**
+*	Some issue fixed by TeasBHOP - NekoGan
+*	Code reference:
+*	https://github.com/hermansimensen/bash2/pull/34 - 100Gn Fix.
+*	Thanks a lot.
+*
+*	Issues Fix list:
+*	1. SafetyGroups not work.
+*	2. 100% Gain (idle/ramp jumps)
+*/
+
 #pragma newdecls required
 
 #include <sourcemod>
@@ -17,7 +28,7 @@ bool g_bSteamWorks = false;
 
 public Plugin myinfo =
 {
-	name = "[Shavit BASH 2] (Blacky's Anti-Strafehack)",
+	name = "[Shavit BASH 2 FIX] (Blacky's Anti-Strafehack)",
 	author = "Blacky, edited by carnifex/nimmy/eric",
 	description = "Detects strafe hackers",
 	version = "3.1",
@@ -851,7 +862,8 @@ public void OnClientAuthorized(int client, const char[] auth)
 	char groupID[16];
 	g_hSafeGroup.GetString(groupID, sizeof(groupID));
 
-	SteamWorks_GetUserGroupStatus(client, StringToInt(groupID));
+	int authid = GetSteamAccountID(client)
+	SteamWorks_GetUserGroupStatusAuthID(authid, StringToInt(groupID));
 }
 
 public void OnClientDisconnect(int client)
@@ -2893,6 +2905,9 @@ void UpdateGains(int client, float vel[3], float angles[3], int buttons)
 			GetEntProp(client, Prop_Data, "m_nWaterLevel") < 2 &&
 			!(GetEntityFlags(client) & FL_ATCONTROLS))
 		{
+			if (FloatAbs(vel[0]) < 1.0 && FloatAbs(vel[1]) < 1.0)
+				return;
+
 			bool isYawing = false;
 			if(buttons & IN_LEFT) isYawing = !isYawing;
 			if(buttons & IN_RIGHT) isYawing = !isYawing;
@@ -2917,6 +2932,9 @@ void UpdateGains(int client, float vel[3], float angles[3], int buttons)
 			float velocity[3];
 			GetEntPropVector(client, Prop_Data, "m_vecAbsVelocity", velocity);
 
+			if (FloatAbs(velocity[0]) < 1.0 && FloatAbs(velocity[1]) < 1.0)
+				return;
+
 			float fore[3], side[3], wishvel[3], wishdir[3];
 			float wishspeed, wishspd, currentgain;
 
@@ -2931,7 +2949,11 @@ void UpdateGains(int client, float vel[3], float angles[3], int buttons)
 				wishvel[i] = fore[i] * vel[0] + side[i] * vel[1];
 
 			wishspeed = NormalizeVector(wishvel, wishdir);
-			if(wishspeed > GetEntPropFloat(client, Prop_Send, "m_flMaxspeed")) wishspeed = GetEntPropFloat(client, Prop_Send, "m_flMaxspeed");
+			if(wishspeed == 0.0)
+				return;
+
+			float maxSpeed = GetEntPropFloat(client, Prop_Send, "m_flMaxspeed");
+			if(wishspeed > maxSpeed) wishspeed = maxSpeed;
 
 			if(wishspeed)
 			{
@@ -2939,18 +2961,20 @@ void UpdateGains(int client, float vel[3], float angles[3], int buttons)
 
 				currentgain = GetVectorDotProduct(velocity, wishdir);
 				if(currentgain < 30.0)
+				{
 					gaincoeff = (wishspd - FloatAbs(currentgain)) / wishspd;
-				if(g_bTouchesWall[client] && gaincoeff > 0.5)
-				{
-					gaincoeff -= 1;
-					gaincoeff = FloatAbs(gaincoeff);
-				}
 
-				if(!g_bTouchesFuncRotating[client])
-				{
-					g_flRawGain[client] += gaincoeff;
-				}
+					if(g_bTouchesWall[client] && gaincoeff > 0.5)
+					{
+						gaincoeff -= 1;
+						gaincoeff = FloatAbs(gaincoeff);
+					}
 
+					if(!g_bTouchesFuncRotating[client])
+					{
+						g_flRawGain[client] += gaincoeff;
+					}
+				}
 			}
 		}
 		g_iTicksOnGround[client] = 0;
