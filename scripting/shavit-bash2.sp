@@ -7,6 +7,7 @@
 */
 
 #pragma newdecls required
+#pragma dynamic 12000
 
 #include <sourcemod>
 #include <sdktools>
